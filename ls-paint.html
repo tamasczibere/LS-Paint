@@ -78,8 +78,8 @@ body{font-family:Segoe UI,Tahoma,sans-serif;font-size:13px;background:var(--bg);
 .fmt-cb{font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px;color:var(--text2);margin-left:6px;white-space:nowrap}
 .fmt-cb input{margin:0}
 #fontFamily{font-size:12px;padding:2px 4px;border:1px solid var(--input-border);border-radius:3px;background:var(--input-bg);color:var(--text);max-width:130px;font-family:inherit;color-scheme:light dark}
-#fontFamily option{background:var(--input-bg);color:var(--text)}
 #fontFamily:focus{border-color:var(--input-focus);outline:none}
+#fontFamily option{background:var(--input-bg);color:var(--text)}
 #fontSizeInput{width:42px;font-size:12px;color:var(--text);border:1px solid var(--input-border);border-radius:3px;padding:2px 4px;text-align:center;font-family:inherit;background:var(--input-bg);-moz-appearance:textfield}
 #fontSizeInput::-webkit-inner-spin-button,#fontSizeInput::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 #fontSizeInput:focus{border-color:var(--input-focus);outline:none}
@@ -304,25 +304,7 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
   </div>
   <div class="tool-group" id="fontGroup" style="display:none">
     <span class="tool-label">Font:</span>
-    <select id="fontFamily">
-      <option value="sans-serif" style="font-family:sans-serif">Sans-serif</option>
-      <option value="Arial" style="font-family:Arial">Arial</option>
-      <option value="Helvetica" style="font-family:Helvetica">Helvetica</option>
-      <option value="Verdana" style="font-family:Verdana">Verdana</option>
-      <option value="Tahoma" style="font-family:Tahoma">Tahoma</option>
-      <option value="Trebuchet MS" style="font-family:Trebuchet MS">Trebuchet MS</option>
-      <option value="serif" style="font-family:serif">Serif</option>
-      <option value="Times New Roman" style="font-family:Times New Roman">Times New Roman</option>
-      <option value="Georgia" style="font-family:Georgia">Georgia</option>
-      <option value="Garamond" style="font-family:Garamond">Garamond</option>
-      <option value="monospace" style="font-family:monospace">Monospace</option>
-      <option value="Courier New" style="font-family:Courier New">Courier New</option>
-      <option value="Consolas" style="font-family:Consolas">Consolas</option>
-      <option value="Lucida Console" style="font-family:Lucida Console">Lucida Console</option>
-      <option value="Comic Sans MS" style="font-family:Comic Sans MS">Comic Sans MS</option>
-      <option value="Impact" style="font-family:Impact">Impact</option>
-      <option value="Rubik" style="font-family:Rubik">Rubik</option>
-    </select>
+    <select id="fontFamily"></select>
     <span class="tool-label">Size:</span>
     <button class="size-btn" id="fontMinus" title="Decrease font size">&#8722;</button>
     <input type="number" id="fontSizeInput" min="8" max="200" value="20">
@@ -411,6 +393,8 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
       <div class="hrow"><span class="hkey">Ctrl + drag selection</span><span class="hdesc">Copy selection (original stays in place)</span></div>
       <div class="hrow"><span class="hkey">Ctrl + C / X / V</span><span class="hdesc">Copy / Cut / Paste (also system clipboard)</span></div>
       <div class="hrow"><span class="hkey">Ctrl + A</span><span class="hdesc">Select all</span></div>
+      <div class="hrow"><span class="hkey">Drag selection handles</span><span class="hdesc">Stretch / resize selection content</span></div>
+      <div class="hrow"><span class="hkey">Drag rotation handle</span><span class="hdesc">Rotate selection (Shift = snap 15&deg;)</span></div>
       <div class="hrow"><span class="hkey">Esc</span><span class="hdesc">Deselect / cancel</span></div>
       <div class="hrow"><span class="hkey">Delete</span><span class="hdesc">Delete selection (or clear canvas)</span></div>
     </div>
@@ -497,8 +481,12 @@ const MAX_UNDO = 40;
 
 // Selection
 let selectMode = 'rect'; // 'rect' or 'ellipse'
-let sel = null; // {x, y, w, h, data: ImageData|null, floating: bool}
+let sel = null; // {x, y, w, h, angle, data: ImageData|null, floating: bool}
 let selDragStart = null;
+let selResizeHandle = null; // 'nw','n','ne','w','e','sw','s','se' or null
+let selResizeStart = null;  // {mx, my, x, y, w, h} — original mouse pos + original sel rect
+let selRotating = false;
+let selRotateStart = null; // angle offset at drag start
 let marchOffset = 0;
 let marchInterval = null;
 
@@ -537,6 +525,12 @@ function drawColor(button) {
 }
 
 function clamp(v, mn, mx) { return Math.max(mn, Math.min(mx, v)); }
+
+function rotatePoint(px, py, cx, cy, angle) {
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const dx = px - cx, dy = py - cy;
+  return {x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos};
+}
 
 // ============================================================
 // CANVAS MANAGEMENT
@@ -661,13 +655,21 @@ function floodFill(sx, sy, color) {
 function commitSelection() {
   if (!sel) return;
   if (sel.data && sel.floating) {
-    // Use temp canvas + drawImage for proper alpha compositing (ellipse transparency)
     const tmp = document.createElement('canvas');
-    tmp.width = sel.w; tmp.height = sel.h;
+    tmp.width = sel.data.width; tmp.height = sel.data.height;
     tmp.getContext('2d').putImageData(sel.data, 0, 0);
-    ctx.drawImage(tmp, sel.x, sel.y);
+    const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(sel.angle || 0);
+    ctx.drawImage(tmp, 0, 0, sel.data.width, sel.data.height, -sel.w / 2, -sel.h / 2, sel.w, sel.h);
+    ctx.restore();
   }
   sel = null;
+  selResizeHandle = null;
+  selResizeStart = null;
+  selRotating = false;
+  selRotateStart = null;
   clearOverlay();
   stopMarch();
 }
@@ -690,43 +692,135 @@ function drawMarchingAnts() {
   clearOverlay();
   if (!sel) return;
   const isEllipse = (sel._mode || selectMode) === 'ellipse';
+  const angle = sel.angle || 0;
+  const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
 
   function drawAnts() {
     octx.save();
+    octx.translate(cx, cy);
+    octx.rotate(angle);
     octx.lineWidth = 1;
     octx.setLineDash([4, 4]);
     if (isEllipse) {
-      const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
       octx.lineDashOffset = -marchOffset;
       octx.strokeStyle = '#000';
-      octx.beginPath(); octx.ellipse(cx, cy, sel.w / 2, sel.h / 2, 0, 0, Math.PI * 2); octx.stroke();
+      octx.beginPath(); octx.ellipse(0, 0, sel.w / 2, sel.h / 2, 0, 0, Math.PI * 2); octx.stroke();
       octx.lineDashOffset = -marchOffset + 4;
       octx.strokeStyle = '#fff';
-      octx.beginPath(); octx.ellipse(cx, cy, sel.w / 2, sel.h / 2, 0, 0, Math.PI * 2); octx.stroke();
+      octx.beginPath(); octx.ellipse(0, 0, sel.w / 2, sel.h / 2, 0, 0, Math.PI * 2); octx.stroke();
     } else {
       octx.lineDashOffset = -marchOffset;
       octx.strokeStyle = '#000';
-      octx.strokeRect(sel.x + 0.5, sel.y + 0.5, sel.w - 1, sel.h - 1);
+      octx.strokeRect(-sel.w / 2 + 0.5, -sel.h / 2 + 0.5, sel.w - 1, sel.h - 1);
       octx.lineDashOffset = -marchOffset + 4;
       octx.strokeStyle = '#fff';
-      octx.strokeRect(sel.x + 0.5, sel.y + 0.5, sel.w - 1, sel.h - 1);
+      octx.strokeRect(-sel.w / 2 + 0.5, -sel.h / 2 + 0.5, sel.w - 1, sel.h - 1);
     }
     octx.restore();
   }
 
   drawAnts();
-  // Draw floating image preview
+  // Draw floating image preview (rotated + scaled)
   if (sel.data && sel.floating) {
     const tmp = document.createElement('canvas');
-    tmp.width = sel.w; tmp.height = sel.h;
+    tmp.width = sel.data.width; tmp.height = sel.data.height;
     tmp.getContext('2d').putImageData(sel.data, 0, 0);
-    octx.drawImage(tmp, sel.x, sel.y);
+    octx.save();
+    octx.translate(cx, cy);
+    octx.rotate(angle);
+    octx.drawImage(tmp, 0, 0, sel.data.width, sel.data.height, -sel.w / 2, -sel.h / 2, sel.w, sel.h);
+    octx.restore();
     drawAnts(); // re-draw ants on top
+  }
+
+  // Draw 8 resize handles (in canvas space, already rotated by getSelHandles)
+  const hs = SEL_HANDLE_SIZE;
+  for (const h of getSelHandles()) {
+    octx.fillStyle = '#fff';
+    octx.strokeStyle = '#000';
+    octx.lineWidth = 1;
+    octx.setLineDash([]);
+    octx.fillRect(h.x - hs / 2, h.y - hs / 2, hs, hs);
+    octx.strokeRect(h.x - hs / 2, h.y - hs / 2, hs, hs);
+  }
+
+  // Draw rotation handle (circle above top-center, connected by dashed line)
+  const rotHandle = getRotateHandle();
+  const topN = getSelHandles().find(h => h.id === 'n');
+  if (rotHandle && topN) {
+    octx.save();
+    octx.setLineDash([3, 3]);
+    octx.strokeStyle = '#555';
+    octx.lineWidth = 1;
+    octx.beginPath();
+    octx.moveTo(topN.x, topN.y);
+    octx.lineTo(rotHandle.x, rotHandle.y);
+    octx.stroke();
+    octx.setLineDash([]);
+    octx.beginPath();
+    octx.arc(rotHandle.x, rotHandle.y, 5, 0, Math.PI * 2);
+    octx.fillStyle = '#4a90d9';
+    octx.fill();
+    octx.strokeStyle = '#2a6ab5';
+    octx.lineWidth = 1.5;
+    octx.stroke();
+    octx.restore();
   }
 }
 
 function clearOverlay() {
   octx.clearRect(0, 0, overlay.width, overlay.height);
+}
+
+const SEL_HANDLE_SIZE = 6;
+const SEL_ROTATE_DIST = 20; // distance of rotation handle above top-center
+
+function getSelHandles() {
+  if (!sel) return [];
+  const {x, y, w, h} = sel;
+  const cx = x + w / 2, cy = y + h / 2;
+  const angle = sel.angle || 0;
+  const local = [
+    {id: 'nw', lx: x,     ly: y},
+    {id: 'n',  lx: cx,    ly: y},
+    {id: 'ne', lx: x + w, ly: y},
+    {id: 'w',  lx: x,     ly: cy},
+    {id: 'e',  lx: x + w, ly: cy},
+    {id: 'sw', lx: x,     ly: y + h},
+    {id: 's',  lx: cx,    ly: y + h},
+    {id: 'se', lx: x + w, ly: y + h},
+  ];
+  return local.map(h => {
+    const r = rotatePoint(h.lx, h.ly, cx, cy, angle);
+    return {id: h.id, x: r.x, y: r.y};
+  });
+}
+
+function getRotateHandle() {
+  if (!sel) return null;
+  const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
+  const angle = sel.angle || 0;
+  return rotatePoint(cx, sel.y - SEL_ROTATE_DIST, cx, cy, angle);
+}
+
+function hitTestRotateHandle(px, py) {
+  const rh = getRotateHandle();
+  if (!rh) return false;
+  const tol = Math.max(SEL_HANDLE_SIZE, 6 / zoom);
+  return Math.abs(px - rh.x) <= tol && Math.abs(py - rh.y) <= tol;
+}
+
+function hitTestSelHandle(px, py) {
+  const hs = SEL_HANDLE_SIZE / zoom;
+  for (const h of getSelHandles()) {
+    if (Math.abs(px - h.x) <= hs && Math.abs(py - h.y) <= hs) return h.id;
+  }
+  return null;
+}
+
+function handleCursor(id) {
+  const map = {nw:'nwse-resize',n:'ns-resize',ne:'nesw-resize',w:'ew-resize',e:'ew-resize',sw:'nesw-resize',s:'ns-resize',se:'nwse-resize'};
+  return map[id] || 'default';
 }
 
 function liftSelection(copyMode) {
@@ -765,11 +859,15 @@ function liftSelection(copyMode) {
   }
 }
 
-function insideSelection(x, y) {
+function insideSelection(px, py) {
   if (!sel) return false;
+  // Unrotate the test point into local (unrotated) space
+  const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
+  const angle = sel.angle || 0;
+  const p = rotatePoint(px, py, cx, cy, -angle);
+  const x = p.x, y = p.y;
   const mode = sel._mode || selectMode;
   if (mode === 'ellipse') {
-    const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
     const rx = sel.w / 2, ry = sel.h / 2;
     if (rx <= 0 || ry <= 0) return false;
     const dx = (x - cx) / rx, dy = (y - cy) / ry;
@@ -780,17 +878,40 @@ function insideSelection(x, y) {
 
 function selectAll() {
   commitSelection();
-  sel = {x: 0, y: 0, w: canvas.width, h: canvas.height, data: null, floating: false};
+  sel = {x: 0, y: 0, w: canvas.width, h: canvas.height, angle: 0, data: null, floating: false};
   startMarch();
 }
 
 function cropToSelection() {
   if (!sel) return;
-  const data = sel.floating && sel.data ? sel.data : ctx.getImageData(sel.x, sel.y, sel.w, sel.h);
   saveState();
-  canvas.width = sel.w;
-  canvas.height = sel.h;
-  ctx.putImageData(data, 0, 0);
+  if (sel.floating && sel.data) {
+    const angle = sel.angle || 0;
+    const src = document.createElement('canvas');
+    src.width = sel.data.width; src.height = sel.data.height;
+    src.getContext('2d').putImageData(sel.data, 0, 0);
+    if (Math.abs(angle) > 0.001) {
+      const cos = Math.abs(Math.cos(angle)), sin = Math.abs(Math.sin(angle));
+      const bw = Math.ceil(sel.w * cos + sel.h * sin);
+      const bh = Math.ceil(sel.w * sin + sel.h * cos);
+      canvas.width = bw; canvas.height = bh;
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, bw, bh);
+      ctx.save();
+      ctx.translate(bw / 2, bh / 2);
+      ctx.rotate(angle);
+      ctx.drawImage(src, 0, 0, sel.data.width, sel.data.height, -sel.w / 2, -sel.h / 2, sel.w, sel.h);
+      ctx.restore();
+    } else {
+      canvas.width = sel.w; canvas.height = sel.h;
+      ctx.drawImage(src, 0, 0, sel.data.width, sel.data.height, 0, 0, sel.w, sel.h);
+    }
+  } else {
+    const data = ctx.getImageData(sel.x, sel.y, sel.w, sel.h);
+    canvas.width = sel.w;
+    canvas.height = sel.h;
+    ctx.putImageData(data, 0, 0);
+  }
   sel = null;
   stopMarch();
   syncOverlay();
@@ -803,7 +924,29 @@ function cropToSelection() {
 function copySelection() {
   if (!sel) return;
   if (sel.floating && sel.data) {
-    clipboard = sel.data;
+    const angle = sel.angle || 0;
+    const src = document.createElement('canvas');
+    src.width = sel.data.width; src.height = sel.data.height;
+    src.getContext('2d').putImageData(sel.data, 0, 0);
+    if (Math.abs(angle) > 0.001) {
+      // Compute axis-aligned bounding box of rotated rect
+      const cos = Math.abs(Math.cos(angle)), sin = Math.abs(Math.sin(angle));
+      const bw = Math.ceil(sel.w * cos + sel.h * sin);
+      const bh = Math.ceil(sel.w * sin + sel.h * cos);
+      const tmp = document.createElement('canvas');
+      tmp.width = bw; tmp.height = bh;
+      const tc = tmp.getContext('2d');
+      tc.translate(bw / 2, bh / 2);
+      tc.rotate(angle);
+      tc.drawImage(src, 0, 0, sel.data.width, sel.data.height, -sel.w / 2, -sel.h / 2, sel.w, sel.h);
+      clipboard = tc.getImageData(0, 0, bw, bh);
+    } else {
+      const tmp = document.createElement('canvas');
+      tmp.width = sel.w; tmp.height = sel.h;
+      const tc = tmp.getContext('2d');
+      tc.drawImage(src, 0, 0, sel.data.width, sel.data.height, 0, 0, sel.w, sel.h);
+      clipboard = tc.getImageData(0, 0, sel.w, sel.h);
+    }
   } else {
     clipboard = ctx.getImageData(sel.x, sel.y, sel.w, sel.h);
   }
@@ -839,7 +982,7 @@ function pasteClipboard(imgData) {
   if (!data) return;
   commitSelection();
   saveState();
-  sel = {x: 0, y: 0, w: data.width, h: data.height, data: data, floating: true};
+  sel = {x: 0, y: 0, w: data.width, h: data.height, angle: 0, data: data, floating: true};
   startMarch();
   drawMarchingAnts();
   setTool('select');
@@ -1256,14 +1399,46 @@ function onCanvasMouseDown(e) {
 
   if (currentTool === 'select') {
     const isCtrl = e.ctrlKey || e.metaKey;
+    // Check rotation handle FIRST
+    if (sel && hitTestRotateHandle(x, y)) {
+      if (!sel.floating) {
+        saveState();
+        liftSelection(false);
+      }
+      const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
+      selRotating = true;
+      selRotateStart = Math.atan2(y - cy, x - cx) - (sel.angle || 0);
+      isDrawing = true;
+      return;
+    }
+    // Check resize handle hit BEFORE checking insideSelection
+    if (sel) {
+      const hid = hitTestSelHandle(x, y);
+      if (hid) {
+        // Auto-lift if not floating
+        if (!sel.floating) {
+          saveState();
+          liftSelection(false);
+        }
+        selResizeHandle = hid;
+        selResizeStart = {mx: x, my: y, x: sel.x, y: sel.y, w: sel.w, h: sel.h};
+        isDrawing = true;
+        return;
+      }
+    }
     if (sel && insideSelection(x, y)) {
       // Ctrl+drag on already-floating selection: stamp current copy, then drag a new one
       if (isCtrl && sel.floating && sel.data) {
         saveState();
+        const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
         const tmp = document.createElement('canvas');
-        tmp.width = sel.w; tmp.height = sel.h;
+        tmp.width = sel.data.width; tmp.height = sel.data.height;
         tmp.getContext('2d').putImageData(sel.data, 0, 0);
-        ctx.drawImage(tmp, sel.x, sel.y);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(sel.angle || 0);
+        ctx.drawImage(tmp, 0, 0, sel.data.width, sel.data.height, -sel.w / 2, -sel.h / 2, sel.w, sel.h);
+        ctx.restore();
         // sel.data stays the same — it becomes the new copy to drag
       }
       selDragStart = {x, y, selX: sel.x, selY: sel.y, lifted: sel.floating, ctrl: isCtrl};
@@ -1273,7 +1448,7 @@ function onCanvasMouseDown(e) {
     // Commit old selection, start new one
     commitSelection();
     startX = x; startY = y;
-    sel = {x, y, w: 0, h: 0, data: null, floating: false};
+    sel = {x, y, w: 0, h: 0, angle: 0, data: null, floating: false};
     isDrawing = true;
     startMarch();
     return;
@@ -1316,9 +1491,20 @@ function onDocMouseMove(e) {
   }
 
   if (!isDrawing) {
-    // Update cursor for selection move
-    if (currentTool === 'select' && sel && insideSelection(x, y)) {
-      canvas.style.cursor = 'move';
+    // Update cursor for selection handles / move / default
+    if (currentTool === 'select' && sel) {
+      if (hitTestRotateHandle(x, y)) {
+        canvas.style.cursor = 'grab';
+      } else {
+        const hid = hitTestSelHandle(x, y);
+        if (hid) {
+          canvas.style.cursor = handleCursor(hid);
+        } else if (insideSelection(x, y)) {
+          canvas.style.cursor = 'move';
+        } else {
+          canvas.style.cursor = 'crosshair';
+        }
+      }
     } else if (currentTool === 'select') {
       canvas.style.cursor = 'crosshair';
     }
@@ -1333,6 +1519,62 @@ function onDocMouseMove(e) {
   }
 
   if (currentTool === 'select') {
+    // Rotating selection
+    if (selRotating) {
+      const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
+      let angle = Math.atan2(y - cy, x - cx) - selRotateStart;
+      if (shiftHeld) {
+        const snap = Math.PI / 12; // 15 degrees
+        angle = Math.round(angle / snap) * snap;
+      }
+      sel.angle = angle;
+      drawMarchingAnts();
+      return;
+    }
+    if (selResizeHandle && selResizeStart) {
+      // Resizing selection (anchor-based, works with rotation)
+      const angle = sel.angle || 0;
+      const o = selResizeStart;
+      const ocx = o.x + o.w / 2, ocy = o.y + o.h / 2;
+      // Unit vectors along local axes (rotated)
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      const ux = {x: cos, y: sin}, uy = {x: -sin, y: cos};
+
+      // Determine anchor in local space (opposite side/corner)
+      let ax = ocx, ay = ocy; // anchor in local unrotated coords
+      if (selResizeHandle.includes('e')) ax = o.x;
+      else if (selResizeHandle.includes('w')) ax = o.x + o.w;
+      if (selResizeHandle === 'n' || selResizeHandle === 'nw' || selResizeHandle === 'ne') ay = o.y + o.h;
+      else if (selResizeHandle === 's' || selResizeHandle === 'sw' || selResizeHandle === 'se') ay = o.y;
+      // Edge-only handles: anchor center on the perpendicular axis
+      if (selResizeHandle === 'n' || selResizeHandle === 's') ax = ocx;
+      if (selResizeHandle === 'w' || selResizeHandle === 'e') ay = ocy;
+
+      // Rotate anchor to canvas space
+      const anchor = rotatePoint(ax, ay, ocx, ocy, angle);
+      // Vector from anchor to mouse in canvas space
+      const vx = x - anchor.x, vy = y - anchor.y;
+      // Project onto local axes
+      const localX = vx * ux.x + vy * ux.y;
+      const localY = vx * uy.x + vy * uy.y;
+
+      let nw = o.w, nh = o.h;
+      if (selResizeHandle.includes('e') || selResizeHandle.includes('w')) nw = Math.max(2, Math.abs(localX));
+      if ('n nw ne s sw se'.split(' ').includes(selResizeHandle)) nh = Math.max(2, Math.abs(localY));
+
+      // New center = anchor + half extent along each local axis
+      const extX = (selResizeHandle.includes('e') || selResizeHandle.includes('w')) ? localX / 2 : 0;
+      const extY = ('n nw ne s sw se'.split(' ').includes(selResizeHandle)) ? localY / 2 : 0;
+      const ncx = anchor.x + extX * ux.x + extY * uy.x;
+      const ncy = anchor.y + extX * ux.y + extY * uy.y;
+
+      sel.w = nw;
+      sel.h = nh;
+      sel.x = ncx - nw / 2;
+      sel.y = ncy - nh / 2;
+      drawMarchingAnts();
+      return;
+    }
     if (selDragStart) {
       // Moving selection
       if (!selDragStart.lifted) {
@@ -1394,7 +1636,13 @@ function onDocMouseUp(e) {
   const {x, y} = getCoords(e);
 
   if (currentTool === 'select') {
-    if (selDragStart) {
+    if (selRotating) {
+      selRotating = false;
+      selRotateStart = null;
+    } else if (selResizeHandle) {
+      selResizeHandle = null;
+      selResizeStart = null;
+    } else if (selDragStart) {
       selDragStart = null;
     } else {
       // Finalize selection rect
@@ -2003,6 +2251,71 @@ function applyDarkMode(on) {
 darkToggle.addEventListener('change', () => applyDarkMode(darkToggle.checked));
 // Restore preference
 try { if (localStorage.getItem('paint-dark') === '1') applyDarkMode(true); } catch(e) {}
+
+// ============================================================
+// FONT DETECTION
+// ============================================================
+(function populateFonts() {
+  const testStr = 'mmmmmmmmmmlli1|WMg@#';
+  const testSize = '72px';
+  const baseFonts = ['monospace', 'sans-serif', 'serif'];
+  const c = document.createElement('canvas').getContext('2d');
+
+  // Measure baseline widths for each generic family
+  const baseWidths = {};
+  for (const base of baseFonts) {
+    c.font = testSize + ' ' + base;
+    baseWidths[base] = c.measureText(testStr).width;
+  }
+
+  function isFontAvailable(font) {
+    for (const base of baseFonts) {
+      c.font = testSize + ' "' + font + '", ' + base;
+      if (c.measureText(testStr).width !== baseWidths[base]) return true;
+    }
+    return false;
+  }
+
+  const genericFamilies = [
+    {value: 'sans-serif', label: 'Sans-serif'},
+    {value: 'serif', label: 'Serif'},
+    {value: 'monospace', label: 'Monospace'},
+  ];
+
+  const candidateFonts = [
+    'Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS',
+    'Times New Roman', 'Georgia', 'Garamond', 'Palatino',
+    'Courier New', 'Consolas', 'Lucida Console',
+    'Comic Sans MS', 'Impact', 'Rubik',
+    'Liberation Sans', 'Liberation Serif', 'Liberation Mono',
+    'DejaVu Sans', 'DejaVu Serif', 'DejaVu Sans Mono',
+    'Noto Sans', 'Noto Serif', 'Ubuntu', 'Cantarell', 'Droid Sans',
+    'Segoe UI', 'Calibri', 'Cambria', 'Corbel',
+  ];
+
+  const sel = document.getElementById('fontFamily');
+  // Add generic families first (always available)
+  for (const g of genericFamilies) {
+    const opt = document.createElement('option');
+    opt.value = g.value;
+    opt.textContent = g.label;
+    opt.style.fontFamily = g.value;
+    sel.appendChild(opt);
+  }
+  // Add detected fonts
+  const seen = new Set(genericFamilies.map(g => g.value.toLowerCase()));
+  for (const font of candidateFonts) {
+    if (seen.has(font.toLowerCase())) continue;
+    if (isFontAvailable(font)) {
+      const opt = document.createElement('option');
+      opt.value = font;
+      opt.textContent = font;
+      opt.style.fontFamily = font;
+      sel.appendChild(opt);
+      seen.add(font.toLowerCase());
+    }
+  }
+})();
 
 // ============================================================
 // INIT

@@ -6,7 +6,7 @@ The intuitive paint solution.
 
 **It draws things.** Pencil, eraser, shapes, polygons, stars, text with rich formatting — the whole circus.
 **It selects things.** Rectangle, ellipse, or freehand lasso. Move, stretch, rotate, copy-paste. Ctrl+drag to clone.
-**It stays out of your way.** Dark mode, zoom, keyboard shortcuts, drag & drop images.
+**It stays out of your way.** Dark mode, easy canvas size change with mouse or exact values, keyboard shortcuts, drag & drop images.
 
 ## Build
 

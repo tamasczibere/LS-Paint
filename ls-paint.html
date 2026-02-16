@@ -2,7 +2,7 @@
 <html lang="hu">
 <head>
 <meta charset="UTF-8">
-<title>LS Paint 0.1</title>
+<title>LS Paint — image</title>
 <style>
 :root{--bg:#e8e8e8;--bar:#f0f0f0;--bar2:#f5f5f5;--border:#ccc;--border2:#d0d0d0;--surface:#fff;--text:#333;--text2:#555;--text3:#888;--hover:#e0e0e0;--active:#cde4f7;--active-border:#7eb4ea;--active-bg:#b8d6f0;--menu-hover:#e8f0fe;--input-bg:#fff;--input-border:#bbb;--input-focus:#4a90d9;--workspace:#c0c0c0;--canvas-shadow:none;--btn-bg:#fff;--btn-bg2:#f0f0f0;--accent:#4a90d9;--accent2:#3a7ac0;--dialog-bg:#fff;--sep:#ccc;--handle:#4a90d9;--handle-border:#2a6ab5}
 body.dark{--bg:#1e1e1e;--bar:#2a2a2a;--bar2:#252525;--border:#444;--border2:#3a3a3a;--surface:#333;--text:#ddd;--text2:#aaa;--text3:#777;--hover:#3a3a3a;--active:#1a3a5c;--active-border:#4a7aaa;--active-bg:#2a4a6a;--menu-hover:#2a3a4a;--input-bg:#2a2a2a;--input-border:#555;--input-focus:#5a9ada;--workspace:#3a3a3a;--canvas-shadow:0 0 20px rgba(0,0,0,.4);--btn-bg:#333;--btn-bg2:#383838;--accent:#5a9ada;--accent2:#4a8aca;--dialog-bg:#2e2e2e;--sep:#444;--handle:#5a9ada;--handle-border:#4a7aaa}
@@ -72,8 +72,9 @@ body{font-family:Segoe UI,Tahoma,sans-serif;font-size:13px;background:var(--bg);
 /* text editing overlay */
 #text-wrapper{position:absolute;display:none;z-index:20}
 #text-bar{display:flex;align-items:center;gap:2px;background:var(--accent);padding:1px 3px;cursor:move;border-radius:3px 3px 0 0;height:18px}
-#text-commit{width:18px;height:14px;border:none;background:rgba(255,255,255,.3);border-radius:2px;cursor:pointer;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;margin-left:auto}
-#text-commit:hover{background:rgba(255,255,255,.5)}
+#text-commit,#text-cancel{width:18px;height:14px;border:none;background:rgba(255,255,255,.3);border-radius:2px;cursor:pointer;color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;line-height:1}
+#text-commit:hover,#text-cancel:hover{background:rgba(255,255,255,.5)}
+#text-cancel{margin-left:auto;font-size:14px}
 #text-content{border:1px dashed var(--accent);border-top:none;background:transparent;outline:none;font-family:sans-serif;overflow:hidden;min-width:40px;min-height:20px;padding:2px 4px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:break-word;resize:both}
 .fmt-cb{font-size:12px;cursor:pointer;display:flex;align-items:center;gap:3px;color:var(--text2);margin-left:6px;white-space:nowrap}
 .fmt-cb input{margin:0}
@@ -118,16 +119,18 @@ body{font-family:Segoe UI,Tahoma,sans-serif;font-size:13px;background:var(--bg);
 .dim-btn.right{border-radius:0 3px 3px 0;border-left:none}
 #size-edit .size-x{font-size:11px;color:var(--text3);margin:0 2px}
 
-/* confirm dialog overlay */
-#confirm-dialog{display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.3);align-items:center;justify-content:center}
-#confirm-dialog.open{display:flex}
-#confirm-dialog .dialog-box{background:var(--dialog-bg);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.25);padding:20px 24px;min-width:320px;max-width:420px}
-#confirm-dialog .dialog-box p{margin:0 0 16px;font-size:14px;color:var(--text);line-height:1.5}
-#confirm-dialog .dialog-btns{display:flex;justify-content:flex-end;gap:8px}
-#confirm-dialog .dialog-btns button{padding:6px 18px;border-radius:4px;border:1px solid var(--border);background:var(--btn-bg2);cursor:pointer;font-size:13px;color:var(--text)}
-#confirm-dialog .dialog-btns button:hover{background:var(--hover)}
-#confirm-dialog .dialog-btns button.primary{background:var(--accent);color:#fff;border-color:var(--accent2)}
-#confirm-dialog .dialog-btns button.primary:hover{background:var(--accent2)}
+/* confirm / prompt dialog overlay */
+.dialog-overlay{display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.3);align-items:center;justify-content:center}
+.dialog-overlay.open{display:flex}
+.dialog-overlay .dialog-box{background:var(--dialog-bg);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.25);padding:20px 24px;min-width:320px;max-width:420px}
+.dialog-overlay .dialog-box p{margin:0 0 16px;font-size:14px;color:var(--text);line-height:1.5}
+.dialog-overlay .dialog-btns{display:flex;justify-content:flex-end;gap:8px}
+.dialog-overlay .dialog-btns button{padding:6px 18px;border-radius:4px;border:1px solid var(--border);background:var(--btn-bg2);cursor:pointer;font-size:13px;color:var(--text)}
+.dialog-overlay .dialog-btns button:hover{background:var(--hover)}
+.dialog-overlay .dialog-btns button.primary{background:var(--accent);color:#fff;border-color:var(--accent2)}
+.dialog-overlay .dialog-btns button.primary:hover{background:var(--accent2)}
+#prompt-input{width:100%;font-size:14px;padding:6px 8px;border:1px solid var(--input-border);border-radius:4px;background:var(--input-bg);color:var(--text);font-family:inherit;margin:0 0 16px;box-sizing:border-box}
+#prompt-input:focus{border-color:var(--input-focus);outline:none}
 
 /* help panel */
 #help-btn{width:22px;height:22px;border-radius:50%;border:1px solid var(--input-border);background:var(--btn-bg);cursor:pointer;font-size:13px;font-weight:bold;color:var(--accent);display:flex;align-items:center;justify-content:center;padding:0 0 1px;flex-shrink:0}
@@ -169,9 +172,9 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
       <div data-action="new">New <span class="shortcut">Ctrl+N</span></div>
       <div data-action="open">Open... <span class="shortcut">Ctrl+O</span></div>
       <div class="sep"></div>
-      <div data-action="save-png">Save as PNG <span class="shortcut">Ctrl+S</span></div>
-      <div data-action="save-jpg">Save as JPEG</div>
-      <div data-action="save-webp">Save as WebP</div>
+      <div data-action="save-png">Save as PNG... <span class="shortcut">Ctrl+S</span></div>
+      <div data-action="save-jpg">Save as JPEG...</div>
+      <div data-action="save-webp">Save as WebP...</div>
     </div>
   </div>
   <div class="menu-item" data-menu="edit">Edit
@@ -232,6 +235,10 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
         <div data-selmode="ellipse">
           <svg viewBox="0 0 16 16"><ellipse cx="8" cy="8" rx="7" ry="6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2"/></svg>
           Ellipse
+        </div>
+        <div data-selmode="free">
+          <svg viewBox="0 0 16 16"><path d="M3,12 C3,4 8,2 13,5 C15,8 10,14 6,11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2"/></svg>
+          Free-form
         </div>
       </div>
     </div>
@@ -295,6 +302,18 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
       <svg viewBox="0 0 18 18"><rect x="2" y="4" width="14" height="10" fill="#aaa" stroke="currentColor" stroke-width="1.5"/></svg>
     </button>
   </div>
+  <div class="tool-group" id="lineStyleGroup" style="display:none">
+    <span class="tool-label">Line:</span>
+    <button class="shape-btn active" data-linestyle="solid" title="Solid">
+      <svg viewBox="0 0 18 18"><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
+    <button class="shape-btn" data-linestyle="dashed" title="Dashed">
+      <svg viewBox="0 0 18 18"><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/></svg>
+    </button>
+    <button class="shape-btn" data-linestyle="dotted" title="Dotted">
+      <svg viewBox="0 0 18 18"><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-dasharray="1.5 3"/></svg>
+    </button>
+  </div>
   <div class="tool-group">
     <span class="tool-label">Size:</span>
     <button class="size-btn" id="brushMinus" title="Decrease size">&#8722;</button>
@@ -326,7 +345,7 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
     <div class="resize-handle" id="resize-s"></div>
     <div class="resize-handle" id="resize-e"></div>
     <div id="text-wrapper">
-      <div id="text-bar"><button id="text-commit" title="Commit text (✓)">&#10003;</button></div>
+      <div id="text-bar"><button id="text-cancel" title="Cancel text (Esc)">&times;</button><button id="text-commit" title="Commit text (✓)">&#10003;</button></div>
       <div id="text-content" contenteditable="true"></div>
     </div>
   </div>
@@ -436,12 +455,23 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
   </div>
 </div>
 
-<div id="confirm-dialog">
+<div id="confirm-dialog" class="dialog-overlay">
   <div class="dialog-box">
     <p id="confirm-msg"></p>
     <div class="dialog-btns">
       <button id="confirm-no">No</button>
       <button id="confirm-yes" class="primary">Yes</button>
+    </div>
+  </div>
+</div>
+
+<div id="prompt-dialog" class="dialog-overlay">
+  <div class="dialog-box">
+    <p id="prompt-msg"></p>
+    <input type="text" id="prompt-input">
+    <div class="dialog-btns">
+      <button id="prompt-cancel">Cancel</button>
+      <button id="prompt-ok" class="primary">OK</button>
     </div>
   </div>
 </div>
@@ -467,6 +497,8 @@ let brushSize = 2;
 let zoom = 1;
 let shapeStyle = 'stroke'; // stroke, fill, both
 let rectMode = 'sharp'; // 'sharp' or 'rounded'
+let lineStyle = 'solid'; // 'solid', 'dashed', 'dotted'
+let currentFileName = 'image'; // filename without extension
 
 // Drawing state
 let isDrawing = false;
@@ -480,8 +512,8 @@ const redoStack = [];
 const MAX_UNDO = 40;
 
 // Selection
-let selectMode = 'rect'; // 'rect' or 'ellipse'
-let sel = null; // {x, y, w, h, angle, data: ImageData|null, floating: bool}
+let selectMode = 'rect'; // 'rect', 'ellipse', or 'free'
+let sel = null; // {x, y, w, h, angle, data: ImageData|null, floating: bool, path: [{x,y}]|null}
 let selDragStart = null;
 let selResizeHandle = null; // 'nw','n','ne','w','e','sw','s','se' or null
 let selResizeStart = null;  // {mx, my, x, y, w, h} — original mouse pos + original sel rect
@@ -548,6 +580,9 @@ function applyZoom() {
   canvas.style.height = h + 'px';
   overlay.style.width = w + 'px';
   overlay.style.height = h + 'px';
+  const rendering = (zoom >= 2 || Number.isInteger(zoom)) ? 'pixelated' : 'auto';
+  canvas.style.imageRendering = rendering;
+  overlay.style.imageRendering = rendering;
   document.getElementById('stat-zoom').textContent = Math.round(zoom * 100) + '%';
 }
 
@@ -691,9 +726,21 @@ function stopMarch() {
 function drawMarchingAnts() {
   clearOverlay();
   if (!sel) return;
-  const isEllipse = (sel._mode || selectMode) === 'ellipse';
+  const mode = sel._mode || selectMode;
+  const isEllipse = mode === 'ellipse';
+  const isFree = mode === 'free' && sel.path && sel.path.length > 2;
   const angle = sel.angle || 0;
   const cx = sel.x + sel.w / 2, cy = sel.y + sel.h / 2;
+
+  function freePathInLocal(c) {
+    // Draw freehand path translated so bbox center is at origin
+    c.beginPath();
+    c.moveTo(sel.path[0].x - cx, sel.path[0].y - cy);
+    for (let i = 1; i < sel.path.length; i++) {
+      c.lineTo(sel.path[i].x - cx, sel.path[i].y - cy);
+    }
+    c.closePath();
+  }
 
   function drawAnts() {
     octx.save();
@@ -701,7 +748,14 @@ function drawMarchingAnts() {
     octx.rotate(angle);
     octx.lineWidth = 1;
     octx.setLineDash([4, 4]);
-    if (isEllipse) {
+    if (isFree) {
+      octx.lineDashOffset = -marchOffset;
+      octx.strokeStyle = '#000';
+      freePathInLocal(octx); octx.stroke();
+      octx.lineDashOffset = -marchOffset + 4;
+      octx.strokeStyle = '#fff';
+      freePathInLocal(octx); octx.stroke();
+    } else if (isEllipse) {
       octx.lineDashOffset = -marchOffset;
       octx.strokeStyle = '#000';
       octx.beginPath(); octx.ellipse(0, 0, sel.w / 2, sel.h / 2, 0, 0, Math.PI * 2); octx.stroke();
@@ -844,6 +898,18 @@ function liftSelection(copyMode) {
     }
   }
 
+  // Apply freehand path mask: make pixels outside polygon transparent
+  if (selectMode === 'free' && sel.path && sel.path.length > 2) {
+    const d = sel.data.data;
+    for (let py = 0; py < sel.h; py++) {
+      for (let px = 0; px < sel.w; px++) {
+        if (!pointInPolygon(sel.x + px + 0.5, sel.y + py + 0.5, sel.path)) {
+          d[(py * sel.w + px) * 4 + 3] = 0;
+        }
+      }
+    }
+  }
+
   if (!copyMode) {
     if (selectMode === 'ellipse') {
       ctx.save();
@@ -852,11 +918,33 @@ function liftSelection(copyMode) {
       ctx.ellipse(sel.x + sel.w / 2, sel.y + sel.h / 2, sel.w / 2, sel.h / 2, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+    } else if (selectMode === 'free' && sel.path && sel.path.length > 2) {
+      ctx.save();
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.moveTo(sel.path[0].x, sel.path[0].y);
+      for (let i = 1; i < sel.path.length; i++) ctx.lineTo(sel.path[i].x, sel.path[i].y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     } else {
       ctx.fillStyle = bgColor;
       ctx.fillRect(sel.x, sel.y, sel.w, sel.h);
     }
   }
+}
+
+// Ray-casting point-in-polygon test
+function pointInPolygon(px, py, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i].x, yi = poly[i].y;
+    const xj = poly[j].x, yj = poly[j].y;
+    if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
 }
 
 function insideSelection(px, py) {
@@ -872,6 +960,9 @@ function insideSelection(px, py) {
     if (rx <= 0 || ry <= 0) return false;
     const dx = (x - cx) / rx, dy = (y - cy) / ry;
     return dx * dx + dy * dy <= 1;
+  }
+  if (mode === 'free' && sel.path && sel.path.length > 2) {
+    return pointInPolygon(x, y, sel.path);
   }
   return x >= sel.x && x < sel.x + sel.w && y >= sel.y && y < sel.y + sel.h;
 }
@@ -1156,10 +1247,16 @@ function commitText() {
   textActive = false;
 }
 
+function cancelText() {
+  textWrapper.style.display = 'none';
+  textContent.innerHTML = '';
+  textActive = false;
+}
+
 // Text bar drag to reposition
 let textDrag = null;
 textBar.addEventListener('mousedown', e => {
-  if (e.target.id === 'text-commit') return;
+  if (e.target.id === 'text-commit' || e.target.id === 'text-cancel') return;
   e.preventDefault();
   textDrag = {mx: e.clientX, my: e.clientY, ox: textWrapper.offsetLeft, oy: textWrapper.offsetTop};
 });
@@ -1173,8 +1270,9 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('mouseup', () => { textDrag = null; });
 
-// Commit button
+// Commit & cancel buttons
 document.getElementById('text-commit').addEventListener('click', () => commitText());
+document.getElementById('text-cancel').addEventListener('click', () => cancelText());
 
 // Live format updates - selection-sensitive
 const fmtCmdMap = {fontBold:'bold', fontItalic:'italic', fontUnderline:'underline', fontStrike:'strikeThrough'};
@@ -1251,7 +1349,30 @@ document.getElementById('fontFamily').addEventListener('change', () => {
 // ============================================================
 // DRAWING HELPERS
 // ============================================================
+function applyLineDash(c, size) {
+  if (lineStyle === 'dashed') { c.setLineDash([size * 3, size * 2]); }
+  else if (lineStyle === 'dotted') { c.setLineDash([1, size * 2]); c.lineCap = 'round'; }
+  else { c.setLineDash([]); }
+}
+
+function drawPixelLine(c, x0, y0, x1, y1, color) {
+  c.fillStyle = color;
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  while (true) {
+    c.fillRect(x0, y0, 1, 1);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 < dx) { err += dx; y0 += sy; }
+  }
+}
+
 function drawLineOnCtx(c, x1, y1, x2, y2, color, size) {
+  if (size <= 1) { drawPixelLine(c, x1, y1, x2, y2, color); return; }
   c.save();
   c.strokeStyle = color;
   c.lineWidth = size;
@@ -1287,6 +1408,7 @@ function drawShapePreview(c, tool, x1, y1, x2, y2, color, fillCol, size, shift) 
   c.lineWidth = size;
   c.lineCap = 'round';
   c.lineJoin = 'miter';
+  applyLineDash(c, size);
 
   if (tool === 'line') {
     let tx2 = x2, ty2 = y2;
@@ -1335,7 +1457,9 @@ function setTool(t) {
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
 
   const shapeTools = ['rect', 'ellipse'];
+  const lineTools = ['line', 'rect', 'ellipse'];
   document.getElementById('shapeStyleGroup').style.display = shapeTools.includes(t) ? 'flex' : 'none';
+  document.getElementById('lineStyleGroup').style.display = lineTools.includes(t) ? 'flex' : 'none';
   document.getElementById('fontGroup').style.display = t === 'text' ? 'flex' : 'none';
 
   canvas.style.cursor =
@@ -1448,7 +1572,11 @@ function onCanvasMouseDown(e) {
     // Commit old selection, start new one
     commitSelection();
     startX = x; startY = y;
-    sel = {x, y, w: 0, h: 0, angle: 0, data: null, floating: false};
+    if (selectMode === 'free') {
+      sel = {x, y, w: 0, h: 0, angle: 0, data: null, floating: false, path: [{x, y}], _mode: 'free', _drawing: true};
+    } else {
+      sel = {x, y, w: 0, h: 0, angle: 0, data: null, floating: false};
+    }
     isDrawing = true;
     startMarch();
     return;
@@ -1462,12 +1590,17 @@ function onCanvasMouseDown(e) {
   if (currentTool === 'pencil' || currentTool === 'eraser') {
     saveState();
     const color = currentTool === 'eraser' ? bgColor : drawColor(e.button);
-    ctx.save();
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    if (brushSize <= 1) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, 1, 1);
+    } else {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'ellipse') {
@@ -1585,6 +1718,14 @@ function onDocMouseMove(e) {
       sel.x = selDragStart.selX + (x - selDragStart.x);
       sel.y = selDragStart.selY + (y - selDragStart.y);
       drawMarchingAnts();
+    } else if (sel && sel._drawing && sel.path) {
+      // Drawing freehand selection — accumulate points
+      sel.path.push({x, y});
+      // Update bbox for overlay
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of sel.path) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+      sel.x = minX; sel.y = minY; sel.w = maxX - minX; sel.h = maxY - minY;
+      drawMarchingAnts();
     } else {
       // Drawing new selection
       const lx = Math.min(startX, x), ly = Math.min(startY, y);
@@ -1644,6 +1785,19 @@ function onDocMouseUp(e) {
       selResizeStart = null;
     } else if (selDragStart) {
       selDragStart = null;
+    } else if (sel && sel._drawing && sel.path) {
+      // Finalize freehand selection
+      delete sel._drawing;
+      if (sel.path.length < 5 || sel.w < 2 || sel.h < 2) {
+        sel = null;
+        stopMarch();
+      } else {
+        // Compute final bbox
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of sel.path) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+        sel.x = minX; sel.y = minY; sel.w = maxX - minX; sel.h = maxY - minY;
+        drawMarchingAnts();
+      }
     } else {
       // Finalize selection rect
       if (sel && sel.w < 2 && sel.h < 2) {
@@ -1692,7 +1846,30 @@ workspace.addEventListener('wheel', e => {
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setZoom(Math.round((zoom + delta) * 100) / 100);
+    const newZoom = clamp(Math.round((zoom + delta) * 100) / 100, 0.05, 32);
+    if (newZoom === zoom) return;
+
+    // Canvas-area offset within workspace (includes margin)
+    const areaRect = canvasArea.getBoundingClientRect();
+    const wsRect = workspace.getBoundingClientRect();
+
+    // Mouse position relative to workspace viewport
+    const mxInWs = e.clientX - wsRect.left;
+    const myInWs = e.clientY - wsRect.top;
+
+    // Canvas coordinate under cursor (in canvas pixels)
+    const canvasX = (e.clientX - areaRect.left) / zoom;
+    const canvasY = (e.clientY - areaRect.top) / zoom;
+
+    // Current scroll + mouse offset gives the absolute position in scrollable content
+    // After zoom change, the canvas pixel (canvasX, canvasY) moves to new screen position
+    // We want: newScrollLeft + mxInWs = margin + canvasX * newZoom
+    // The canvasArea has margin:20px
+    const margin = 20;
+    const oldZoom = zoom;
+    setZoom(newZoom);
+    workspace.scrollLeft = margin + canvasX * newZoom - mxInWs;
+    workspace.scrollTop = margin + canvasY * newZoom - myInWs;
   }
 }, {passive: false});
 
@@ -1722,7 +1899,7 @@ document.addEventListener('keydown', e => {
   if (ctrl && e.key === '-') { e.preventDefault(); setZoom(Math.round((zoom - 0.05) * 100) / 100); }
   if (ctrl && e.key === '0') { e.preventDefault(); setZoom(1); }
   if (e.key === 'Escape') {
-    if (textActive) commitText();
+    if (textActive) cancelText();
     else if (sel) { commitSelection(); }
   }
   if (e.key === 'Delete') {
@@ -1767,6 +1944,10 @@ document.addEventListener('paste', e => {
 // ============================================================
 // FILE OPERATIONS
 // ============================================================
+function updateTitle() {
+  document.title = 'LS Paint \u2014 ' + currentFileName;
+}
+
 function newCanvas() {
   saveState();
   canvas.width = 800;
@@ -1777,6 +1958,8 @@ function newCanvas() {
   stopMarch();
   syncOverlay();
   updateSizeStatus();
+  currentFileName = 'Untitled';
+  updateTitle();
 }
 
 function openFile(file) {
@@ -1790,19 +1973,25 @@ function openFile(file) {
     stopMarch();
     syncOverlay();
     updateSizeStatus();
+    currentFileName = file.name.replace(/\.[^.]+$/, '') || 'image';
+    updateTitle();
   };
   img.src = URL.createObjectURL(file);
 }
 
-function saveFile(format) {
+async function saveFile(format) {
   commitSelection();
   commitText();
-  const mime = format === 'jpg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
   const ext = format === 'jpg' ? 'jpg' : format === 'webp' ? 'webp' : 'png';
+  const name = await showPrompt('Save as:', currentFileName);
+  if (!name) return;
+  currentFileName = name;
+  updateTitle();
+  const mime = format === 'jpg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
   canvas.toBlob(blob => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'image.' + ext;
+    a.download = name + '.' + ext;
     a.click();
     URL.revokeObjectURL(a.href);
   }, mime, 0.92);
@@ -2009,6 +2198,8 @@ document.querySelectorAll('#selectDropMenu div[data-selmode]').forEach(el => {
     const icon = document.getElementById('selectIcon');
     if (selectMode === 'ellipse') {
       icon.innerHTML = '<ellipse cx="9" cy="9" rx="7" ry="6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>';
+    } else if (selectMode === 'free') {
+      icon.innerHTML = '<path d="M3,12 C3,4 8,2 13,5 C15,8 10,14 6,11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>';
     } else {
       icon.innerHTML = '<rect x="2" y="2" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/>';
     }
@@ -2034,7 +2225,14 @@ document.querySelectorAll('#rectDropMenu div[data-rectmode]').forEach(el => {
 document.querySelectorAll('.shape-btn[data-shapestyle]').forEach(btn => {
   btn.addEventListener('click', () => {
     shapeStyle = btn.dataset.shapestyle;
-    document.querySelectorAll('.shape-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('#shapeStyleGroup .shape-btn').forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
+
+document.querySelectorAll('.shape-btn[data-linestyle]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    lineStyle = btn.dataset.linestyle;
+    document.querySelectorAll('#lineStyleGroup .shape-btn').forEach(b => b.classList.toggle('active', b === btn));
   });
 });
 
@@ -2170,6 +2368,30 @@ function showConfirm(msg) {
     function onNo() { cleanup(false); }
     document.getElementById('confirm-yes').addEventListener('click', onYes);
     document.getElementById('confirm-no').addEventListener('click', onNo);
+  });
+}
+
+function showPrompt(msg, defaultVal) {
+  return new Promise(resolve => {
+    const dlg = document.getElementById('prompt-dialog');
+    const input = document.getElementById('prompt-input');
+    document.getElementById('prompt-msg').textContent = msg;
+    input.value = defaultVal || '';
+    dlg.classList.add('open');
+    setTimeout(() => { input.focus(); input.select(); }, 10);
+    function cleanup(val) {
+      dlg.classList.remove('open');
+      document.getElementById('prompt-ok').removeEventListener('click', onOk);
+      document.getElementById('prompt-cancel').removeEventListener('click', onCancel);
+      input.removeEventListener('keydown', onKey);
+      resolve(val);
+    }
+    function onOk() { cleanup(input.value || null); }
+    function onCancel() { cleanup(null); }
+    function onKey(e) { if (e.key === 'Enter') onOk(); if (e.key === 'Escape') onCancel(); }
+    document.getElementById('prompt-ok').addEventListener('click', onOk);
+    document.getElementById('prompt-cancel').addEventListener('click', onCancel);
+    input.addEventListener('keydown', onKey);
   });
 }
 

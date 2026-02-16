@@ -34,6 +34,8 @@ body{font-family:Segoe UI,Tahoma,sans-serif;font-size:13px;background:var(--bg);
 #brushSize{width:80px;vertical-align:middle}
 #brushSizeVal{width:42px;font-size:12px;color:var(--text);border:1px solid var(--input-border);border-radius:3px;padding:2px 4px;text-align:center;font-family:inherit;background:var(--input-bg);-moz-appearance:textfield}
 #brushSizeVal::-webkit-inner-spin-button,#brushSizeVal::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+#polySides::-webkit-inner-spin-button,#polySides::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+#polySides{-moz-appearance:textfield}
 #brushSizeVal:focus{border-color:var(--input-focus);outline:none}
 .shape-style-group{display:flex;align-items:center;gap:2px}
 .shape-btn{width:28px;height:26px;border:1px solid transparent;border-radius:3px;background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text)}
@@ -281,6 +283,23 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
       <svg viewBox="0 0 18 18"><ellipse cx="9" cy="9" rx="7" ry="5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
       <span>Ellipse</span>
     </button>
+    <div class="tool-btn-drop">
+      <button class="tool-btn" data-tool="polygon" title="Polygon (G)" id="polyBtn">
+        <svg id="polyIcon" viewBox="0 0 18 18"><polygon points="9,1 16.5,6.5 14,15.5 4,15.5 1.5,6.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <span>Polygon</span>
+      </button>
+      <button class="drop-arrow" id="polyDropArrow" title="Polygon mode">&#9662;</button>
+      <div class="drop-menu" id="polyDropMenu">
+        <div data-polymode="polygon" class="dm-active">
+          <svg viewBox="0 0 16 16"><polygon points="8,1 15,5.5 13,14 3,14 1,5.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          Polygon
+        </div>
+        <div data-polymode="star">
+          <svg viewBox="0 0 16 16"><polygon points="8,1 9.8,6 15,6.5 11,10 12.5,15 8,12 3.5,15 5,10 1,6.5 6.2,6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          Star
+        </div>
+      </div>
+    </div>
     <button class="tool-btn" data-tool="text" title="Text (T)">
       <svg viewBox="0 0 18 18"><text x="4" y="14" font-size="14" font-weight="bold" fill="currentColor">A</text></svg>
       <span>Text</span>
@@ -313,6 +332,15 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
     <button class="shape-btn" data-linestyle="dotted" title="Dotted">
       <svg viewBox="0 0 18 18"><line x1="2" y1="9" x2="16" y2="9" stroke="currentColor" stroke-width="2" stroke-dasharray="1.5 3"/></svg>
     </button>
+  </div>
+  <div class="tool-group" id="polyGroup" style="display:none">
+    <span class="tool-label">Sides:</span>
+    <button class="size-btn" id="polyMinus">&#8722;</button>
+    <input type="number" id="polySides" value="5" min="3" max="64" style="width:36px;font-size:12px;color:var(--text);border:1px solid var(--input-border);border-radius:3px;padding:2px 4px;text-align:center;font-family:inherit;background:var(--input-bg);-moz-appearance:textfield">
+    <button class="size-btn" id="polyPlus">+</button>
+    <span class="tool-label" id="polyInnerLabel" style="display:none">Inner:</span>
+    <input type="range" id="polyInnerRatio" min="10" max="90" value="38" style="width:60px;display:none" title="Inner radius ratio">
+    <span id="polyInnerVal" style="font-size:11px;color:var(--text2);min-width:28px;display:none">38%</span>
   </div>
   <div class="tool-group">
     <span class="tool-label">Size:</span>
@@ -400,6 +428,7 @@ input[type=color]{position:absolute;visibility:hidden;width:0;height:0}
       <div class="hrow"><span class="hkey">L</span><span class="hdesc">Line</span></div>
       <div class="hrow"><span class="hkey">R</span><span class="hdesc">Rectangle</span></div>
       <div class="hrow"><span class="hkey">O</span><span class="hdesc">Ellipse</span></div>
+      <div class="hrow"><span class="hkey">G</span><span class="hdesc">Polygon / Star (drag to place + rotate)</span></div>
       <div class="hrow"><span class="hkey">T</span><span class="hdesc">Text (drag to set box size, drag bar to move, &#10003; to commit)</span></div>
       <div class="hrow"><span class="hkey">I</span><span class="hdesc">Color picker (eyedropper)</span></div>
       <div class="hrow"><span class="hkey">Left click</span><span class="hdesc">Draw with foreground color</span></div>
@@ -498,6 +527,7 @@ let zoom = 1;
 let shapeStyle = 'stroke'; // stroke, fill, both
 let rectMode = 'sharp'; // 'sharp' or 'rounded'
 let lineStyle = 'solid'; // 'solid', 'dashed', 'dotted'
+let polyMode = 'polygon'; // 'polygon' or 'star'
 let currentFileName = 'image'; // filename without extension
 
 // Drawing state
@@ -1400,6 +1430,30 @@ function roundRectPath(c, x, y, w, h, r) {
   c.closePath();
 }
 
+function polyPath(c, cx, cy, radius, sides, star, innerRatio) {
+  c.beginPath();
+  const step = (Math.PI * 2) / sides;
+  const startAngle = -Math.PI / 2; // point up
+  if (star) {
+    const inner = radius * (innerRatio / 100);
+    for (let i = 0; i < sides; i++) {
+      const outerA = startAngle + i * step;
+      const innerA = outerA + step / 2;
+      const ox = cx + Math.cos(outerA) * radius, oy = cy + Math.sin(outerA) * radius;
+      const ix = cx + Math.cos(innerA) * inner, iy = cy + Math.sin(innerA) * inner;
+      if (i === 0) c.moveTo(ox, oy); else c.lineTo(ox, oy);
+      c.lineTo(ix, iy);
+    }
+  } else {
+    for (let i = 0; i < sides; i++) {
+      const a = startAngle + i * step;
+      const px = cx + Math.cos(a) * radius, py = cy + Math.sin(a) * radius;
+      if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+    }
+  }
+  c.closePath();
+}
+
 function drawShapePreview(c, tool, x1, y1, x2, y2, color, fillCol, size, shift) {
   let lx = Math.min(x1, x2), ly = Math.min(y1, y2);
   let w = Math.abs(x2 - x1), h = Math.abs(y2 - y1);
@@ -1443,6 +1497,22 @@ function drawShapePreview(c, tool, x1, y1, x2, y2, color, fillCol, size, shift) 
     c.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2);
     if (shapeStyle === 'fill' || shapeStyle === 'both') { c.fillStyle = fillCol; c.fill(); }
     if (shapeStyle === 'stroke' || shapeStyle === 'both') { c.strokeStyle = color; c.stroke(); }
+  } else if (tool === 'polygon') {
+    c.lineJoin = 'round';
+    const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+    const radius = Math.hypot(x2 - x1, y2 - y1) / 2;
+    const sides = parseInt(document.getElementById('polySides').value) || 5;
+    const innerRatio = parseInt(document.getElementById('polyInnerRatio').value) || 38;
+    const isStar = polyMode === 'star';
+    // Rotation: angle from center to mouse
+    const angle = Math.atan2(y2 - cy, x2 - cx) + Math.PI / 2;
+    c.save();
+    c.translate(cx, cy);
+    c.rotate(angle);
+    polyPath(c, 0, 0, radius, sides, isStar, innerRatio);
+    c.restore();
+    if (shapeStyle === 'fill' || shapeStyle === 'both') { c.fillStyle = fillCol; c.fill(); }
+    if (shapeStyle === 'stroke' || shapeStyle === 'both') { c.strokeStyle = color; c.stroke(); }
   }
   c.restore();
 }
@@ -1456,10 +1526,11 @@ function setTool(t) {
   currentTool = t;
   document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
 
-  const shapeTools = ['rect', 'ellipse'];
-  const lineTools = ['line', 'rect', 'ellipse'];
+  const shapeTools = ['rect', 'ellipse', 'polygon'];
+  const lineTools = ['line', 'rect', 'ellipse', 'polygon'];
   document.getElementById('shapeStyleGroup').style.display = shapeTools.includes(t) ? 'flex' : 'none';
   document.getElementById('lineStyleGroup').style.display = lineTools.includes(t) ? 'flex' : 'none';
+  document.getElementById('polyGroup').style.display = t === 'polygon' ? 'flex' : 'none';
   document.getElementById('fontGroup').style.display = t === 'text' ? 'flex' : 'none';
 
   canvas.style.cursor =
@@ -1603,7 +1674,7 @@ function onCanvasMouseDown(e) {
     }
   }
 
-  if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'ellipse') {
+  if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'ellipse' || currentTool === 'polygon') {
     saveState();
   }
 }
@@ -1758,7 +1829,7 @@ function onDocMouseMove(e) {
   }
 
   // Shape/line preview on overlay
-  if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'ellipse') {
+  if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'ellipse' || currentTool === 'polygon') {
     clearOverlay();
     const color = drawColor(drawButton);
     const fillCol = drawButton === 2 ? fgColor : bgColor;
@@ -1817,7 +1888,7 @@ function onDocMouseUp(e) {
     return;
   }
 
-  if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'ellipse') {
+  if (currentTool === 'line' || currentTool === 'rect' || currentTool === 'ellipse' || currentTool === 'polygon') {
     clearOverlay();
     const color = drawColor(drawButton);
     const fillCol = drawButton === 2 ? fgColor : bgColor;
@@ -1911,7 +1982,7 @@ document.addEventListener('keydown', e => {
   const ae = document.activeElement;
   const inInput = ae === textContent || ae?.tagName === 'INPUT';
   if (!ctrl && !inInput) {
-    const map = {s: 'select', p: 'pencil', e: 'eraser', f: 'fill', l: 'line', r: 'rect', o: 'ellipse', t: 'text', i: 'picker'};
+    const map = {s: 'select', p: 'pencil', e: 'eraser', f: 'fill', l: 'line', r: 'rect', o: 'ellipse', g: 'polygon', t: 'text', i: 'picker'};
     if (map[e.key]) setTool(map[e.key]);
     if (e.key === 'x' || e.key === 'X') { [fgColor, bgColor] = [bgColor, fgColor]; updateColorDisplay(); }
   }
@@ -2190,23 +2261,25 @@ document.getElementById('brushSize').addEventListener('wheel', e => {
   updateBrushSize(e.deltaY > 0 ? -1 : 1);
 }, {passive: false});
 
-// Select mode dropdown
+// Tool dropdown elements
 const selectDropArrow = document.getElementById('selectDropArrow');
 const selectDropMenu = document.getElementById('selectDropMenu');
+const rectDropArrow = document.getElementById('rectDropArrow');
+const rectDropMenu = document.getElementById('rectDropMenu');
+const polyDropArrow = document.getElementById('polyDropArrow');
+const polyDropMenu = document.getElementById('polyDropMenu');
 
 selectDropArrow.addEventListener('click', e => {
   e.stopPropagation();
   rectDropMenu.classList.remove('open');
+  polyDropMenu.classList.remove('open');
   selectDropMenu.classList.toggle('open');
 });
-
-// Rectangle mode dropdown
-const rectDropArrow = document.getElementById('rectDropArrow');
-const rectDropMenu = document.getElementById('rectDropMenu');
 
 rectDropArrow.addEventListener('click', e => {
   e.stopPropagation();
   selectDropMenu.classList.remove('open');
+  polyDropMenu.classList.remove('open');
   rectDropMenu.classList.toggle('open');
 });
 
@@ -2214,6 +2287,7 @@ rectDropArrow.addEventListener('click', e => {
 document.addEventListener('click', e => {
   if (!e.target.closest('#selectDropArrow')) selectDropMenu.classList.remove('open');
   if (!e.target.closest('#rectDropArrow')) rectDropMenu.classList.remove('open');
+  if (!e.target.closest('#polyDropArrow')) polyDropMenu.classList.remove('open');
 });
 
 document.querySelectorAll('#selectDropMenu div[data-selmode]').forEach(el => {
@@ -2260,6 +2334,52 @@ document.querySelectorAll('.shape-btn[data-linestyle]').forEach(btn => {
     lineStyle = btn.dataset.linestyle;
     document.querySelectorAll('#lineStyleGroup .shape-btn').forEach(b => b.classList.toggle('active', b === btn));
   });
+});
+
+// Polygon mode dropdown
+polyDropArrow.addEventListener('click', e => {
+  e.stopPropagation();
+  selectDropMenu.classList.remove('open');
+  rectDropMenu.classList.remove('open');
+  polyDropMenu.classList.toggle('open');
+});
+
+function updatePolyStarUI() {
+  const show = polyMode === 'star';
+  document.getElementById('polyInnerLabel').style.display = show ? '' : 'none';
+  document.getElementById('polyInnerRatio').style.display = show ? '' : 'none';
+  document.getElementById('polyInnerVal').style.display = show ? '' : 'none';
+}
+
+document.querySelectorAll('#polyDropMenu div[data-polymode]').forEach(el => {
+  el.addEventListener('click', () => {
+    polyMode = el.dataset.polymode;
+    document.querySelectorAll('#polyDropMenu div').forEach(d => d.classList.toggle('dm-active', d === el));
+    polyDropMenu.classList.remove('open');
+    const icon = document.getElementById('polyIcon');
+    if (polyMode === 'star') {
+      icon.innerHTML = '<polygon points="9,1 10.8,6.5 16,7 12,10.5 13.2,15.5 9,12.5 4.8,15.5 6,10.5 2,7 7.2,6.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>';
+    } else {
+      icon.innerHTML = '<polygon points="9,1 16.5,6.5 14,15.5 4,15.5 1.5,6.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>';
+    }
+    updatePolyStarUI();
+    setTool('polygon');
+  });
+});
+
+// Polygon sides +/-
+document.getElementById('polyMinus').addEventListener('click', () => {
+  const el = document.getElementById('polySides');
+  el.value = Math.max(3, parseInt(el.value) - 1);
+});
+document.getElementById('polyPlus').addEventListener('click', () => {
+  const el = document.getElementById('polySides');
+  el.value = Math.min(64, parseInt(el.value) + 1);
+});
+
+// Inner ratio slider
+document.getElementById('polyInnerRatio').addEventListener('input', () => {
+  document.getElementById('polyInnerVal').textContent = document.getElementById('polyInnerRatio').value + '%';
 });
 
 // ============================================================

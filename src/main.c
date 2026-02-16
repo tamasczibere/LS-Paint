@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libgen.h>
+#include <gdk/gdkkeysyms.h>
 
 /* LS Paint 0.3 — Native wrapper
  * Loads ls-paint.html from the same directory as the binary
@@ -31,6 +32,65 @@ static char *find_html(const char *argv0) {
     return NULL;
 }
 
+/* MIME type from file extension */
+static const char *mime_from_path(const char *path) {
+    const char *dot = strrchr(path, '.');
+    if (!dot) return NULL;
+    if (g_ascii_strcasecmp(dot, ".png") == 0)  return "image/png";
+    if (g_ascii_strcasecmp(dot, ".jpg") == 0)  return "image/jpeg";
+    if (g_ascii_strcasecmp(dot, ".jpeg") == 0) return "image/jpeg";
+    if (g_ascii_strcasecmp(dot, ".gif") == 0)  return "image/gif";
+    if (g_ascii_strcasecmp(dot, ".bmp") == 0)  return "image/bmp";
+    if (g_ascii_strcasecmp(dot, ".webp") == 0) return "image/webp";
+    if (g_ascii_strcasecmp(dot, ".svg") == 0)  return "image/svg+xml";
+    if (g_ascii_strcasecmp(dot, ".ico") == 0)  return "image/x-icon";
+    if (g_ascii_strcasecmp(dot, ".tif") == 0)  return "image/tiff";
+    if (g_ascii_strcasecmp(dot, ".tiff") == 0) return "image/tiff";
+    return NULL;
+}
+
+/* Intercept Ctrl+V: if GTK clipboard has file URIs pointing to images,
+ * read the file, encode as data URI, and inject into the webview. */
+static gboolean on_key_press(GtkWidget *widget, GdkEventKey *event, gpointer data) {
+    if (!((event->state & GDK_CONTROL_MASK) && event->keyval == GDK_KEY_v))
+        return FALSE;
+
+    GtkClipboard *clip = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+    gchar **uris = gtk_clipboard_wait_for_uris(clip);
+    if (!uris || !uris[0]) {
+        g_strfreev(uris);
+        return FALSE;  /* No file URIs — let webview handle normally */
+    }
+
+    gchar *filepath = g_filename_from_uri(uris[0], NULL, NULL);
+    g_strfreev(uris);
+    if (!filepath) return FALSE;
+
+    const char *mime = mime_from_path(filepath);
+    if (!mime) { g_free(filepath); return FALSE; }
+
+    gchar *contents = NULL;
+    gsize length = 0;
+    if (!g_file_get_contents(filepath, &contents, &length, NULL)) {
+        g_free(filepath);
+        return FALSE;
+    }
+    g_free(filepath);
+
+    gchar *base64 = g_base64_encode((guchar *)contents, length);
+    g_free(contents);
+
+    gchar *js = g_strdup_printf(
+        "pasteImageFromURI('data:%s;base64,%s');", mime, base64);
+    g_free(base64);
+
+    WebKitWebView *webview = WEBKIT_WEB_VIEW(data);
+    webkit_web_view_evaluate_javascript(webview, js, -1, NULL, NULL, NULL, NULL, NULL);
+    g_free(js);
+
+    return TRUE;  /* Consume event — we handled the paste */
+}
+
 int main(int argc, char *argv[]) {
     gtk_init(&argc, &argv);
 
@@ -55,6 +115,9 @@ int main(int argc, char *argv[]) {
     g_signal_connect(window, "destroy", G_CALLBACK(on_destroy), NULL);
 
     WebKitWebView *webview = WEBKIT_WEB_VIEW(webkit_web_view_new());
+
+    /* Intercept Ctrl+V for file clipboard paste */
+    g_signal_connect(window, "key-press-event", G_CALLBACK(on_key_press), webview);
 
     /* Build a file:// base URI so relative resources work */
     char *base_uri = g_filename_to_uri(html_path, NULL, NULL);

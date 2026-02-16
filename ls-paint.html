@@ -1918,26 +1918,52 @@ document.addEventListener('keydown', e => {
 });
 
 // Paste from clipboard
+function pasteImageFromURI(uri) {
+  const img = new Image();
+  img.onload = () => {
+    const tmp = document.createElement('canvas');
+    tmp.width = img.width; tmp.height = img.height;
+    tmp.getContext('2d').drawImage(img, 0, 0);
+    const data = tmp.getContext('2d').getImageData(0, 0, img.width, img.height);
+    pasteWithSizeCheck(data);
+  };
+  img.src = uri;
+}
+
 document.addEventListener('paste', e => {
-  const items = e.clipboardData?.items;
-  if (!items) return;
-  for (const item of items) {
+  const cd = e.clipboardData;
+  if (!cd) return;
+
+  // 1. Direct image data (screenshots, browser-copied images)
+  for (const item of cd.items) {
     if (item.type.startsWith('image/')) {
       e.preventDefault();
-      const blob = item.getAsFile();
-      const img = new Image();
-      img.onload = () => {
-        const tmp = document.createElement('canvas');
-        tmp.width = img.width; tmp.height = img.height;
-        tmp.getContext('2d').drawImage(img, 0, 0);
-        const data = tmp.getContext('2d').getImageData(0, 0, img.width, img.height);
-        pasteWithSizeCheck(data);
-      };
-      img.src = URL.createObjectURL(blob);
+      pasteImageFromURI(URL.createObjectURL(item.getAsFile()));
       return;
     }
   }
-  // Internal paste
+
+  // 2. Files from clipboard (some file managers provide File objects)
+  for (const file of cd.files) {
+    if (file.type.startsWith('image/')) {
+      e.preventDefault();
+      pasteImageFromURI(URL.createObjectURL(file));
+      return;
+    }
+  }
+
+  // 3. File URI from file manager (Ctrl+C in Nautilus, Thunar, Dolphin, etc.)
+  const uriText = cd.getData('text/uri-list') || cd.getData('text/plain') || '';
+  const lines = uriText.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+  for (const uri of lines) {
+    if (/\.(png|jpe?g|gif|bmp|webp|svg|ico|tiff?)$/i.test(uri)) {
+      e.preventDefault();
+      pasteImageFromURI(uri);
+      return;
+    }
+  }
+
+  // 4. Internal paste
   if (clipboard) { e.preventDefault(); pasteClipboard(); }
 });
 
